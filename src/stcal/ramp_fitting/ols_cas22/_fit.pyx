@@ -169,8 +169,8 @@ def fit_ramps(float[:, ::1] resultants,
     cdef float[:, ::1] pixel
     if use_jump:
         # Initialize arrays for the jump detection pre-computed values
-        fixed = np.empty((n_fixed_offsets, n_resultants - 1), dtype=np.float32)
-        pixel = np.empty((n_pixel_offsets, n_resultants - 1), dtype=np.float32)
+        fixed = np.empty((n_resultants - 1, n_fixed_offsets), dtype=np.float32)
+        pixel = np.empty((n_resultants -1, n_pixel_offsets), dtype=np.float32)
 
         # Pre-compute the values from the read pattern
         fixed = fill_fixed_values(fixed, t_bar, tau, n_reads, n_resultants)

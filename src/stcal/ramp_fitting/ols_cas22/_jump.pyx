@@ -101,7 +101,11 @@ cpdef inline float[:, ::1] fill_fixed_values(float[:, ::1] fixed,
         <(1/n_reads[i+2] + 1/n_reads[i])>,
         <(tau[i] + tau[i+1] - 2 * min(t_bar[i], t_bar[i+1]))>,
         <(tau[i] + tau[i+2] - 2 * min(t_bar[i], t_bar[i+2]))>,
-    ]
+    ].T
+
+    Note the transpose is used because the access pattern is actually accessing all the elements
+        for a single resultant at a time. This means we want the different values to be the
+        contiguous elements in memory.
     """
     # Cast the enum values into integers for indexing (otherwise compiler complains)
     #   These will be optimized out
@@ -119,22 +123,22 @@ cpdef inline float[:, ::1] fill_fixed_values(float[:, ::1] fixed,
 
     cdef int i
     for i in range(n_resultants - 1):
-        fixed[single_t_bar_diff, i] = t_bar[i + 1] - t_bar[i]
-        fixed[single_t_bar_diff_sqr, i] = fixed[single_t_bar_diff, i] ** 2
-        fixed[single_read_recip, i] = (num / n_reads[i + 1]) + (num / n_reads[i])
-        fixed[single_var_slope_val, i] = tau[i + 1] + tau[i] - 2 * min(t_bar[i + 1], t_bar[i])
+        fixed[i, single_t_bar_diff] = t_bar[i + 1] - t_bar[i]
+        fixed[i, single_t_bar_diff_sqr] = fixed[i, single_t_bar_diff] ** 2
+        fixed[i, single_read_recip] = (num / n_reads[i + 1]) + (num / n_reads[i])
+        fixed[i, single_var_slope_val] = tau[i + 1] + tau[i] - 2 * min(t_bar[i + 1], t_bar[i])
 
         if i < n_resultants - 2:
-            fixed[double_t_bar_diff, i] = t_bar[i + 2] - t_bar[i]
-            fixed[double_t_bar_diff_sqr, i] = fixed[double_t_bar_diff, i] ** 2
-            fixed[double_read_recip, i] = (num / n_reads[i + 2]) + (num / n_reads[i])
-            fixed[double_var_slope_val, i] = tau[i + 2] + tau[i] - 2 * min(t_bar[i + 2], t_bar[i])
+            fixed[i, double_t_bar_diff] = t_bar[i + 2] - t_bar[i]
+            fixed[i, double_t_bar_diff_sqr] = fixed[i, double_t_bar_diff] ** 2
+            fixed[i, double_read_recip] = (num / n_reads[i + 2]) + (num / n_reads[i])
+            fixed[i, double_var_slope_val] = tau[i + 2] + tau[i] - 2 * min(t_bar[i + 2], t_bar[i])
         else:
             # Last double difference is undefined
-            fixed[double_t_bar_diff, i] = NAN
-            fixed[double_t_bar_diff_sqr, i] = NAN
-            fixed[double_read_recip, i] = NAN
-            fixed[double_var_slope_val, i] = NAN
+            fixed[i, double_t_bar_diff] = NAN
+            fixed[i, double_t_bar_diff_sqr] = NAN
+            fixed[i, double_read_recip] = NAN
+            fixed[i, double_var_slope_val] = NAN
 
     return fixed
 
@@ -172,7 +176,11 @@ cpdef inline float[:, ::1] _fill_pixel_values(float[:, ::1] pixel,
         <(resultants[i+2] - resultants[i])> / <(t_bar[i+2] - t_bar[i])>,
         read_noise**2 * <(1/n_reads[i+1] + 1/n_reads[i])>,
         read_noise**2 * <(1/n_reads[i+2] + 1/n_reads[i])>,
-    ]
+    ].T
+
+    Note the transpose is used because the access pattern is actually accessing all the elements
+        for a single resultant at a time. This means we want the different values to be the
+        contiguous elements in memory.
     """
     cdef int single_t_bar_diff = FixedOffsets.single_t_bar_diff
     cdef int double_t_bar_diff = FixedOffsets.double_t_bar_diff
@@ -188,16 +196,16 @@ cpdef inline float[:, ::1] _fill_pixel_values(float[:, ::1] pixel,
 
     cdef int i
     for i in range(n_resultants - 1):
-        pixel[single_slope, i] = (resultants[i + 1] - resultants[i]) / fixed[single_t_bar_diff, i]
-        pixel[single_var, i] = read_noise_sqr * fixed[single_read_recip, i]
+        pixel[i, single_slope] = (resultants[i + 1] - resultants[i]) / fixed[i, single_t_bar_diff]
+        pixel[i, single_var] = read_noise_sqr * fixed[i, single_read_recip]
 
         if i < n_resultants - 2:
-            pixel[double_slope, i] = (resultants[i + 2] - resultants[i]) / fixed[double_t_bar_diff, i]
-            pixel[double_var, i] = read_noise_sqr * fixed[double_read_recip, i]
+            pixel[i, double_slope] = (resultants[i + 2] - resultants[i]) / fixed[i, double_t_bar_diff]
+            pixel[i, double_var] = read_noise_sqr * fixed[i, double_read_recip]
         else:
             # The last double difference is undefined
-            pixel[double_slope, i] = NAN
-            pixel[double_var, i] = NAN
+            pixel[i, double_slope] = NAN
+            pixel[i, double_var] = NAN
 
     return pixel
 
@@ -354,10 +362,10 @@ cdef inline (int, float) _fit_statistic(float[:, ::1] pixel,
     #    this makes it much easier to compute a "lazy" max.
     cdef int index = ramp.end - 1
     cdef int argmax = ramp.end - ramp.start - 1
-    cdef float max_stat = _statstic(pixel[single_local_slope, index],
-                                    pixel[single_var_read_noise, index],
-                                    fixed[single_t_bar_diff_sqr, index],
-                                    fixed[single_var_slope_val, index],
+    cdef float max_stat = _statstic(pixel[index, single_local_slope],
+                                    pixel[index, single_var_read_noise],
+                                    fixed[index, single_t_bar_diff_sqr],
+                                    fixed[index, single_var_slope_val],
                                     slope,
                                     correct)
 
@@ -366,16 +374,16 @@ cdef inline (int, float) _fit_statistic(float[:, ::1] pixel,
     cdef int stat_index
     for stat_index, index in enumerate(range(ramp.start, ramp.end - 1)):
         # Compute max of single and double difference statistics
-        stat = fmaxf(_statstic(pixel[single_local_slope, index],
-                               pixel[single_var_read_noise, index],
-                               fixed[single_t_bar_diff_sqr, index],
-                               fixed[single_var_slope_val, index],
+        stat = fmaxf(_statstic(pixel[index, single_local_slope],
+                               pixel[index, single_var_read_noise],
+                               fixed[index, single_t_bar_diff_sqr],
+                               fixed[index, single_var_slope_val],
                                slope,
                                correct),
-                    _statstic(pixel[double_local_slope, index],
-                              pixel[double_var_read_noise, index],
-                              fixed[double_t_bar_diff_sqr, index],
-                              fixed[double_var_slope_val, index],
+                    _statstic(pixel[index, double_local_slope],
+                              pixel[index, double_var_read_noise],
+                              fixed[index, double_t_bar_diff_sqr],
+                              fixed[index, double_var_slope_val],
                               slope,
                               correct))
 
