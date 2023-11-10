@@ -93,9 +93,9 @@ class RampFitOutputs(NamedTuple):
 
 @boundscheck(False)
 @wraparound(False)
-def fit_ramps(float[:, :] resultants,
+def fit_ramps(float[:, ::1] resultants,
               cnp.ndarray[int, ndim=2] dq,
-              float[:] read_noise,
+              float[::1] read_noise,
               float read_time,
               list[list[int]] read_pattern,
               bool use_jump=False,
@@ -109,17 +109,27 @@ def fit_ramps(float[:, :] resultants,
         jump detection to mark additional resultants for each pixel as bad if
         a jump is suspected in them.
 
+        Note: This function needs the arrays to be shaped n_pixels x n_resultants
+            and be C contiguous. This is because this function feeds a single pixel's
+            resultants into the jump detection algorithm which operates on "contiguous"
+            sections of that array of resultants. This means for maximum efficiency,
+            the resultants for pixel i, resultants[i, :] should be contiguous a contiguous
+            array.
+
     Parameters
     ----------
-    resultants : float[n_resultants, n_pixel]
+    resultants : float[:, ::1] (shape = (n_pixels, n_resultants))
         the resultants in electrons (Note that this can be based as any sort of
-        array, such as a numpy array. The memmory view is just for efficiency in
+        array, such as a numpy array. The memory view is just for efficiency in
         cython)
-    dq : np.ndarry[n_resultants, n_pixel]
+        The memory needs to be C contiguous, meaning that the for each fixed pixel i,
+        resultants[i, :] is contiguous in memory.
+    dq : np.ndarry[n_pixels, n_resultants]
         the dq array.  dq != 0 implies bad pixel / CR. (Kept as a numpy array
         so that it can be passed out without copying into new numpy array, will
         be working on memmory views of this array)
-    read_noise : float[n_pixel]
+        The memory needs to be C contiguous, see resultants for details.
+    read_noise : float[::1] (shape = (n_pixels,))
         the read noise in electrons for each pixel (same note as the resultants)
     read_time : float
         Time to perform a readout. For Roman data, this is FRAME_TIME.
@@ -140,8 +150,8 @@ def fit_ramps(float[:, :] resultants,
     A RampFitOutputs tuple
     """
     cdef int n_pixels, n_resultants
-    n_resultants = resultants.shape[0]
-    n_pixels = resultants.shape[1]
+    n_pixels = resultants.shape[0]
+    n_resultants = resultants.shape[1]
 
     # Raise error if input data is inconsistent
     if n_resultants != len(read_pattern):
@@ -150,13 +160,13 @@ def fit_ramps(float[:, :] resultants,
 
     # Compute the main metadata from the read pattern and cast it to memory views
     cdef ReadPattern metadata = from_read_pattern(read_pattern, read_time, n_resultants)
-    cdef float[:] t_bar = metadata.t_bar
-    cdef float[:] tau = metadata.tau
-    cdef int[:] n_reads = metadata.n_reads
+    cdef float[::1] t_bar = metadata.t_bar
+    cdef float[::1] tau = metadata.tau
+    cdef int[::1] n_reads = metadata.n_reads
 
     # Setup pre-compute arrays for jump detection
-    cdef float[:, :] fixed
-    cdef float[:, :] pixel
+    cdef float[:, ::1] fixed
+    cdef float[:, ::1] pixel
     if use_jump:
         # Initialize arrays for the jump detection pre-computed values
         fixed = np.empty((n_fixed_offsets, n_resultants - 1), dtype=np.float32)
@@ -184,8 +194,8 @@ def fit_ramps(float[:, :] resultants,
     #    zero, where as every variance is calculated and set. This means that the
     #    parameters need to be filled with zeros, where as the variances can just
     #    be allocated
-    cdef float[:, :] parameters = np.zeros((n_pixels, Parameter.n_param), dtype=np.float32)
-    cdef float[:, :] variances = np.empty((n_pixels, Variance.n_var), dtype=np.float32)
+    cdef float[:, ::1] parameters = np.zeros((n_pixels, Parameter.n_param), dtype=np.float32)
+    cdef float[:, ::1] variances = np.empty((n_pixels, Variance.n_var), dtype=np.float32)
 
     # Cast the enum values into integers for indexing (otherwise compiler complains)
     #   These will be optimized out
@@ -196,15 +206,15 @@ def fit_ramps(float[:, :] resultants,
 
     # Pull memory view of dq for speed of access later
     #   changes to this array will backpropagate to the original numpy array
-    cdef int[:, :] dq_ = dq
+    cdef int[:, ::1] dq_ = dq
 
     # Run the jump fitting algorithm for each pixel
     cdef JumpFits fit
     cdef int index
     for index in range(n_pixels):
         # Fit all the ramps for the given pixel
-        fit = fit_jumps(resultants[:, index],
-                        dq_[:, index],
+        fit = fit_jumps(resultants[index, :],
+                        dq_[index, :],
                         read_noise[index],
                         t_bar,
                         tau,

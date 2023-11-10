@@ -119,9 +119,13 @@ def fit_ramps_casertano(
         dq = dq.reshape(orig_shape + (1,))
         read_noise = read_noise.reshape(orig_shape[1:] + (1,))
 
+    # Force the input arrays to be contiguous in memory over the heaviest used
+    #   dimension (resultants), the ascontiguousarray can produce a copy
+    resultants_ = np.ascontiguousarray(resultants.reshape(resultants.shape[0], -1).T)
+    dq_ = np.ascontiguousarray(dq.reshape(dq.shape[0], -1).T)
     output = ols_cas22.fit_ramps(
-        resultants.reshape(resultants.shape[0], -1),
-        dq.reshape(resultants.shape[0], -1),
+        resultants_,
+        dq_,
         read_noise.reshape(-1),
         read_time,
         read_pattern,
@@ -130,7 +134,8 @@ def fit_ramps_casertano(
 
     parameters = output.parameters.reshape(orig_shape[1:] + (2,))
     variances = output.variances.reshape(orig_shape[1:] + (3,))
-    dq = output.dq.reshape(orig_shape)
+    # Undo the contiguous memory trickery for dq, resultants don't need to be touched
+    dq[:, :, :] = output.dq.T.reshape(orig_shape)
 
     if resultants.shape != orig_shape:
         parameters = parameters[0]

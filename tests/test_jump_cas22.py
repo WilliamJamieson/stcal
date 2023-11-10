@@ -45,15 +45,33 @@ def test_init_ramps():
     """
     # from stcal.ramp_fitting.ols_cas22._core import _init_ramps_list
 
-    dq = np.array([[0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1],
-                   [0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1],
-                   [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1],
-                   [0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1]], dtype=np.int32)
+    # dq = np.array([[0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1],
+    #                [0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1],
+    #                [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1],
+    #                [0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1]], dtype=np.int32)
 
-    n_resultants, n_pixels = dq.shape
-    ramps = [init_ramps(dq[:, index], n_resultants) for index in range(n_pixels)]
+    dq = np.array([[0, 0, 0, 0],
+                   [1, 0, 0, 0],
+                   [0, 1, 0, 0],
+                   [0, 0, 1, 0],
+                   [0, 0, 0, 1],
+                   [1, 1, 0, 0],
+                   [1, 0, 1, 0],
+                   [1, 0, 0, 1],
+                   [0, 1, 1, 0],
+                   [0, 1, 0, 1],
+                   [0, 0, 1, 1],
+                   [1, 1, 1, 0],
+                   [1, 1, 0, 1],
+                   [1, 0, 1, 1],
+                   [0, 1, 1, 1],
+                   [1, 1, 1, 1]], dtype=np.int32)
 
-    assert len(ramps) == dq.shape[1] == 16
+    n_pixels, n_resultants = dq.shape
+    ramps = [init_ramps(dq[index, :], n_resultants) for index in range(n_pixels)]
+
+    # Sanity check that we got all the ramps
+    assert len(ramps) == n_pixels == 16
 
     # Check that the ramps are correct
 
@@ -200,7 +218,7 @@ def _generate_resultants(read_pattern, n_pixels=1):
         resultants
             The resultants generated
     """
-    resultants = np.zeros((len(read_pattern), n_pixels), dtype=np.float32)
+    resultants = np.zeros((n_pixels, len(read_pattern)), dtype=np.float32)
 
     # Use Poisson process to simulate the accumulation of the ramp
     ramp_value = np.zeros(n_pixels, dtype=np.float32)  # Last value of ramp
@@ -220,10 +238,10 @@ def _generate_resultants(read_pattern, n_pixels=1):
         )
 
         # Record the average value for resultant (i.e., the average of the reads)
-        resultants[index] = (resultant_total / len(reads)).astype(np.float32)
+        resultants[:, index] = (resultant_total / len(reads)).astype(np.float32)
 
     if n_pixels == 1:
-        resultants = resultants[:, 0]
+        resultants = resultants[0, :]
 
     return resultants
 
@@ -330,8 +348,9 @@ def test_fit_ramps(detector_data, use_jump, use_dq):
     # only use okay ramps
     #   ramps passing the below criterion have at least two adjacent valid reads
     #   i.e., we can make a measurement from them.
-    okay = np.sum((dq[1:, :] == 0) & (dq[:-1, :] == 0), axis=0) != 0
+    okay = np.sum((dq[:, 1:] == 0) & (dq[:, :-1] == 0), axis=1) != 0
     assert okay.dtype == bool
+    assert okay.shape == (N_PIXELS,)
 
     # Note that for use_dq = False, okay == True for all ramps, so we perform
     #    a sanity check that the above criterion is correct
@@ -428,15 +447,15 @@ def jump_data(detector_data):
     assert set(jump_reads) == set(range(num_reads - 1))
 
     # Fill out jump reads with jump values
-    jump_flux = np.zeros((num_reads, N_PIXELS), dtype=np.float32)
+    jump_flux = np.zeros((N_PIXELS, num_reads), dtype=np.float32)
     for index, jump in enumerate(jump_reads):
-        jump_flux[jump:, index] = JUMP_VALUE
+        jump_flux[index, jump:] = JUMP_VALUE
 
     # Average the reads into the resultants
     jump_resultants = np.zeros(N_PIXELS, dtype=np.int32)
     for index, reads in enumerate(read_pattern):
         indices = np.array(reads) - 1
-        resultants[index, :] += np.mean(jump_flux[indices, :], axis=0)
+        resultants[:, index] += np.mean(jump_flux[:, indices], axis=1)
         for read in reads:
             jump_resultants[np.where(jump_reads == read)] = index
 
@@ -549,7 +568,7 @@ def test_jump_dq_set(jump_data):
     output = fit_ramps(resultants, dq, read_noise, READ_TIME, read_pattern, use_jump=True,
                        include_diagnostic=True)
 
-    for fit, pixel_dq in zip(output.fits, output.dq.transpose()):
+    for fit, pixel_dq in zip(output.fits, output.dq):
         # Check that all jumps found get marked
         assert (pixel_dq[fit['jumps']] == JUMP_DET).all()
 

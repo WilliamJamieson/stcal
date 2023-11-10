@@ -146,7 +146,7 @@ cpdef ReadPattern from_read_pattern(list[list[int]] read_pattern, float read_tim
 
 @boundscheck(False)
 @wraparound(False)
-cpdef inline RampQueue init_ramps(int[:] dq, int n_resultants):
+cpdef inline RampQueue init_ramps(int[::1] dq, int n_resultants):
     """
     Create the initial ramp "queue" for each pixel
         if dq[index_resultant, index_pixel] == 0, then the resultant is in a ramp
@@ -238,10 +238,10 @@ cdef inline float _get_power(float signal):
 @boundscheck(False)
 @wraparound(False)
 @cdivision(True)
-cdef inline RampFit fit_ramp(float[:] resultants_,
-                             float[:] t_bar_,
-                             float[:] tau_,
-                             int[:] n_reads_,
+cdef inline RampFit fit_ramp(float[::1] resultants_,
+                             float[::1] t_bar_,
+                             float[::1] tau_,
+                             int[::1] n_reads_,
                              float read_noise,
                              RampIndex ramp):
     """

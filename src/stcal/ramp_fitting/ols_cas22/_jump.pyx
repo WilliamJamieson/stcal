@@ -67,25 +67,25 @@ from stcal.ramp_fitting.ols_cas22._ramp cimport RampIndex, RampQueue, RampFit, f
 @boundscheck(False)
 @wraparound(False)
 @cdivision(True)
-cpdef inline float[:, :] fill_fixed_values(float[:, :] fixed,
-                                           float[:] t_bar,
-                                           float[:] tau,
-                                           int[:] n_reads,
-                                           int n_resultants):
+cpdef inline float[:, ::1] fill_fixed_values(float[:, ::1] fixed,
+                                             float[::1] t_bar,
+                                             float[::1] tau,
+                                             int[::1] n_reads,
+                                             int n_resultants):
     """
     Pre-compute all the values needed for jump detection which only depend on
         the read pattern.
 
     Parameters
     ----------
-    fixed : float[:, :]
+    fixed : float[:, ::1]
         A pre-allocated memoryview to store the pre-computed values in, its faster
         to allocate outside this function.
-    t_bar : float[:]
+    t_bar : float[::1]
         The average time for each resultant
-    tau : float[:]
+    tau : float[::1]
         The time variance for each resultant
-    n_reads : int[:]
+    n_reads : int[::1]
         The number of reads for each resultant
     n_resultants : int
         The number of resultants for the read pattern
@@ -142,11 +142,11 @@ cpdef inline float[:, :] fill_fixed_values(float[:, :] fixed,
 @boundscheck(False)
 @wraparound(False)
 @cdivision(True)
-cpdef inline float[:, :] _fill_pixel_values(float[:, :] pixel,
-                                            float[:] resultants,
-                                            float[:, :] fixed,
-                                            float read_noise,
-                                            int n_resultants):
+cpdef inline float[:, ::1] _fill_pixel_values(float[:, ::1] pixel,
+                                              float[::1] resultants,
+                                              float[:, ::1] fixed,
+                                              float read_noise,
+                                              int n_resultants):
     """
     Pre-compute all the values needed for jump detection which only depend on
         the a specific pixel (independent of the given ramp for a pixel).
@@ -226,7 +226,7 @@ cdef inline float _threshold(Thresh thresh, float slope):
 @boundscheck(False)
 @wraparound(False)
 @cdivision(True)
-cdef inline float _correction(float[:] t_bar, RampIndex ramp, float slope):
+cdef inline float _correction(float[::1] t_bar, RampIndex ramp, float slope):
     """
     Compute the correction factor for the variance used by a statistic
 
@@ -297,9 +297,9 @@ cdef inline float _statstic(float local_slope,
 
 @boundscheck(False)
 @wraparound(False)
-cdef inline (int, float) _fit_statistic(float[:, :] pixel,
-                                        float[:, :] fixed,
-                                        float[:] t_bar,
+cdef inline (int, float) _fit_statistic(float[:, ::1] pixel,
+                                        float[:, ::1] fixed,
+                                        float[::1] t_bar,
                                         float slope,
                                         RampIndex ramp):
     """
@@ -390,15 +390,15 @@ cdef inline (int, float) _fit_statistic(float[:, :] pixel,
 @boundscheck(False)
 @wraparound(False)
 @cdivision(True)
-cdef inline JumpFits fit_jumps(float[:] resultants,
-                               int[:] dq,
+cdef inline JumpFits fit_jumps(float[::1] resultants,
+                               int[::1] dq,
                                float read_noise,
-                               float[:] t_bar,
-                               float[:] tau,
-                               int[:] n_reads,
+                               float[::1] t_bar,
+                               float[::1] tau,
+                               int[::1] n_reads,
                                int n_resultants,
-                               float[:, :] fixed,
-                               float[:, :] pixel,
+                               float[:, ::1] fixed,
+                               float[:, ::1] pixel,
                                Thresh thresh,
                                bool use_jump,
                                bool include_diagnostic):

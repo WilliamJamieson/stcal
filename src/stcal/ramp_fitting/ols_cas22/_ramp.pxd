@@ -23,7 +23,7 @@ cdef class ReadPattern:
     cdef int[::1] n_reads
 
 
-cpdef RampQueue init_ramps(int[:] dq,
+cpdef RampQueue init_ramps(int[::1] dq,
                            int n_resultants)
 
 
@@ -32,9 +32,9 @@ cpdef ReadPattern from_read_pattern(list[list[int]] read_pattern,
                                     int n_resultants)
 
 
-cdef RampFit fit_ramp(float[:] resultants_,
-                      float[:] t_bar_,
-                      float[:] tau_,
-                      int[:] n_reads,
+cdef RampFit fit_ramp(float[::1] resultants_,
+                      float[::1] t_bar_,
+                      float[::1] tau_,
+                      int[::1] n_reads,
                       float read_noise,
                       RampIndex ramp)

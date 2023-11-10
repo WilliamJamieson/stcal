@@ -52,6 +52,7 @@ def test_simulated_ramps(use_unit, use_dq):
     assert output.parameters.shape == (320, 320, 2) == resultants.shape[1:] + (2,)
     assert output.variances.shape == (320, 320, 3) == resultants.shape[1:] + (3,)
     assert output.dq.shape == dq.shape
+    assert np.all(output.dq == dq)
 
     # check the unit
     if use_unit:
